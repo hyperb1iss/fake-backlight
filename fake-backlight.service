@@ -1,0 +1,12 @@
+[Unit]
+Description=Fake backlight service
+PartOf=graphical-session.target
+Requires=dbus.socket
+
+[Service]
+ExecStart=/usr/local/bin/fake-backlight
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target

@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+#
+# fake-backlight
+#
+# on systems where the hardware backlight isn't
+# working, we can fake it using software brightness.
+#
+# this hack will monitor dbus for the relevant events
+# and handle as necessary.
+#
+# steve kondik - shade@chemlab.org
+# license: http://www.wtfpl.net/
+#
+
+import subprocess
+import sys
+import time
+
+import setproctitle
+
+import gi
+gi.require_version('Gdk', '3.0')
+from gi.repository import Gdk
+from gi.repository import GLib
+import pydbus
+
+class FakeBacklight:
+
+    def __init__(self):
+        self.bus = pydbus.SessionBus()
+        self.suspended = False
+        self.connected = False
+        self.power = None
+
+        retries = 15
+        while retries > 0:
+            try:
+                screen = Gdk.Screen.get_default()
+                if screen is not None and screen.get_n_monitors() > 0:
+                    self.current_display = screen.get_monitor_plug_name(0)
+                    self.power = self.bus.get('org.gnome.SettingsDaemon.Power')
+                    self.connected = True
+                    print('Connected to display %s' % self.current_display)
+                    break
+            except:
+                print("Can't find gnome-settings-daemon on D-Bus, retrying")
+
+            time.sleep(2)
+            retries = retries - 1
+
+        if not self.connected:
+            raise ValueError('Unable to connect to service')
+
+    def set_brightness(self, brightness):
+        value = '%.2f' % ((int(brightness) * 0.009) + 0.1)
+        subprocess.check_call(['xrandr', '--output', self.current_display,
+                               '--brightness', value])
+        print('Set brightness: %s' % value)
+
+    def update(self):
+        self.set_brightness(self.power.Get(
+            'org.gnome.SettingsDaemon.Power.Screen', 'Brightness'))
+
+    def monitor(self):
+        def brightness_callback(interface, changed, invalid):
+            if not self.suspended and interface == "org.gnome.SettingsDaemon.Power.Screen":
+                self.set_brightness(changed['Brightness'])
+
+        def resume_callback(suspended):
+            self.suspended = suspended
+            if not self.suspended:
+                self.update()
+
+        system = pydbus.SystemBus()
+        login1 = system.get('org.freedesktop.login1')
+        login1.PrepareForSleep.connect(resume_callback)
+        self.power.PropertiesChanged.connect(brightness_callback)
+
+        print('Fake backlight service starting..')
+        self.update()
+
+        loop = GLib.MainLoop()
+        loop.run()
+
+
+def run():
+    fake_backlight = FakeBacklight()
+
+    setproctitle.setproctitle(sys.argv[0])
+
+    if len(sys.argv) == 2 and sys.argv[1] == '-u':
+        fake_backlight.update()
+        return 0
+    elif len(sys.argv) == 1:
+        fake_backlight.monitor()
+        return 0
+
+    print('usage: %s [-u]' % sys.argv[0])
+    return 1
+
+run()
