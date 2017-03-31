@@ -40,10 +40,10 @@ install like a hax0r:
 ```bash
 sudo pip3 install pydbus;
 mkdir -p ~/.config/systemd/user;
-cp fake-backlight.service ~?.config/systemd/user;
+cp fake-backlight.service ~/.config/systemd/user;
+sudo cp fake-backlight /usr/local/bin/;
 systemctl --user enable fake-backlight;
 systemctl --user start fake-backlight;
-sudo cp fake-backlight /usr/local/bin/;
 ```
 
 hopefully i'll figure out wtf razer did to the backlight
