@@ -2,8 +2,13 @@
 #
 # fake-backlight
 #
+# if standard acpi controls for the display backlight
+# aren't working, we might be able to control it
+# using xbacklight.
+#
 # on systems where the hardware backlight isn't
-# working, we can fake it using software brightness.
+# working, we can fake it using software brightness
+# by calling xrandr.
 #
 # this hack will monitor dbus for the relevant events
 # and handle as necessary.
@@ -11,6 +16,8 @@
 # steve kondik - shade@chemlab.org
 # license: http://www.wtfpl.net/
 #
+
+USE_XRANDR = False
 
 import subprocess
 import sys
@@ -51,11 +58,23 @@ class FakeBacklight:
         if not self.connected:
             raise ValueError('Unable to connect to service')
 
-    def set_brightness(self, brightness):
-        value = '%.2f' % ((int(brightness) * 0.009) + 0.1)
-        subprocess.check_call(['xrandr', '--output', self.current_display,
-                               '--brightness', value])
+    def set_brightness_xrandr(self, brightness):
+        value = round(((int(brightness) * 0.009) + 0.1) * 100)
+        subprocess.check_call(['nvidia-settings', '-a',
+                               'BacklightBrightness=%d' % value])
         print('Set brightness: %s' % value)
+
+    def set_brightness_xbacklight(self, brightness):
+        value = round(((int(brightness) * 0.009) + 0.1) * 100)
+        subprocess.check_call(['xbacklight', '-set',
+                               '%d' % value])
+        print('Set brightness: %s' % value)
+
+    def set_brightness(self, brightness):
+        if USE_XRANDR:
+            self.set_brightness_xrandr(brightness)
+        else:
+            self.set_brightness_xbacklight(brightness)
 
     def update(self):
         self.set_brightness(self.power.Get(
