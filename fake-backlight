@@ -13,7 +13,7 @@
 # this hack will monitor dbus for the relevant events
 # and handle as necessary.
 #
-# steve kondik - shade@chemlab.org
+# Stefanie Kondik - shade@chemlab.org
 # license: http://www.wtfpl.net/
 #
 
